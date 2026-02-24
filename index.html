@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Pulse Login</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2c5364">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3004/3004451.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body{height:100vh;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);}
+.login-card{width:380px;padding:40px;border-radius:25px;background:white;box-shadow:0 20px 40px rgba(0,0,0,0.25);}
+.login-card h2{text-align:center;margin-bottom:25px;color:#203a43;}
+input{width:100%;padding:14px;margin:12px 0;border-radius:12px;border:1px solid #ddd;outline:none;transition:0.2s;}
+input:focus{border-color:#2c5364;box-shadow:0 0 0 3px rgba(44,83,100,0.2);}
+button{width:100%;padding:14px;margin-top:10px;border:none;border-radius:12px;background:#2c5364;color:white;font-weight:600;cursor:pointer;transition:0.3s;}
+button:hover{background:#1f3c4a;}
+.switch{text-align:center;margin-top:18px;font-size:14px;color:#444;cursor:pointer;}
+.switch span{color:#2c5364;font-weight:600;}
+.code-display{margin-top:15px;padding:12px;background:#eef6fb;border-radius:12px;text-align:center;font-weight:600;color:#2c5364;}
+</style>
+</head>
+
+<body>
+
+<div class="login-card">
+<h2>💙 Family Pulse</h2>
+<input type="text" id="name" placeholder="Your Name">
+<div id="familyCodeInput" style="display:none;">
+<input type="text" id="familyCode" placeholder="Enter Family Code">
+</div>
+<button id="actionBtn">Create Family</button>
+<div class="switch" id="switchContainer">
+Already have a family? <span id="switchBtn">Join here</span>
+</div>
+<div id="generatedCode" class="code-display" style="display:none;"></div>
+</div>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW config error:', err));
+    });
+  }
+</script>
+
+<script type="module">
+import { db } from "./firebase-config.js";
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+let mode = "create";
+
+function showToast(text, isError = false) {
+    Toastify({
+        text: text, duration: 4000, gravity: "top", position: "center",
+        style: { background: isError ? "#ff4d4d" : "#4CAF50", borderRadius: "8px" }
+    }).showToast();
+}
+
+function toggleMode() {
+    mode = mode === "create" ? "join" : "create";
+    document.getElementById("actionBtn").innerText = mode === "create" ? "Create Family" : "Join Family";
+    document.getElementById("familyCodeInput").style.display = mode === "join" ? "block" : "none";
+    
+    const switchContainer = document.getElementById("switchContainer");
+    if (mode === "create") {
+        switchContainer.innerHTML = 'Already have a family? <span id="switchBtn">Join here</span>';
+    } else {
+        switchContainer.innerHTML = 'Want to create new? <span id="switchBtn">Create here</span>';
+    }
+    document.getElementById("switchBtn").addEventListener("click", toggleMode);
+}
+
+document.getElementById("switchBtn").addEventListener("click", toggleMode);
+
+function generateCode() { return "FP-" + Math.random().toString(36).substring(2,8).toUpperCase(); }
+
+document.getElementById("actionBtn").addEventListener("click", async () => {
+    let name = document.getElementById("name").value.trim();
+    if(!name) { showToast("Please enter your name", true); return; }
+
+    if(mode === "create") {
+        let code = generateCode();
+        try {
+            await setDoc(doc(db, "families", code), { admin: name });
+            localStorage.setItem("currentUser", JSON.stringify({ name: name, familyCode: code, role: "admin" }));
+            document.getElementById("generatedCode").style.display = "block";
+            document.getElementById("generatedCode").innerText = "Your Family Code: " + code;
+            showToast("Family created successfully!");
+            setTimeout(() => { window.location.href = "dashboard.html"; }, 1500);
+        } catch (e) { 
+            showToast("Database Error! Check Firebase Rules.", true); 
+            console.error("Firebase Error:", e); 
+        }
+    } else {
+        let code = document.getElementById("familyCode").value.trim();
+        if(!code) { showToast("Please enter a family code", true); return; }
+        try {
+            const docSnap = await getDoc(doc(db, "families", code));
+            if (docSnap.exists()) {
+                localStorage.setItem("currentUser", JSON.stringify({ name: name, familyCode: code, role: "member" }));
+                showToast("Joined successfully!");
+                setTimeout(() => { window.location.href = "dashboard.html"; }, 1000);
+            } else { showToast("Invalid Family Code", true); }
+        } catch (e) { 
+            showToast("Database Error! Check Firebase Rules.", true); 
+            console.error("Firebase Error:", e); 
+        }
+    }
+});
+</script>
+</body>
+</html>
