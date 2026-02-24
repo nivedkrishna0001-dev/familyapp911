@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Family Pulse Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+
+body{
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+padding:30px;
+color:white;
+min-height:100vh;
+}
+.header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:30px;
+}
+
+.code{
+background:white;
+color:#764ba2;
+padding:8px 18px;
+border-radius:20px;
+font-weight:600;
+}
+
+.card{
+background:white;
+color:#333;
+padding:25px;
+border-radius:25px;
+margin-bottom:30px;
+}
+
+.moods{
+display:flex;
+gap:15px;
+margin-bottom:15px;
+}
+
+.moods span{
+font-size:30px;
+cursor:pointer;
+transition:0.2s;
+}
+
+.moods span.selected{
+transform:scale(1.3);
+}
+
+input[type="text"],input[type="number"]{
+width:100%;
+padding:10px;
+margin:6px 0;
+border-radius:12px;
+border:1px solid #ddd;
+}
+
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:12px;
+background:#667eea;
+color:white;
+font-weight:600;
+cursor:pointer;
+margin-top:10px;
+}
+
+.members{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+gap:20px;
+}
+
+.member-card{
+background:white;
+color:#333;
+padding:20px;
+border-radius:20px;
+}
+
+.member-card.sick{
+border:3px solid red;
+}
+
+.delete-btn{
+background:#ff4d4d;
+border:none;
+padding:6px 10px;
+color:white;
+border-radius:8px;
+cursor:pointer;
+margin-top:10px;
+}
+
+.progress{
+height:10px;
+background:#eee;
+border-radius:10px;
+margin-top:5px;
+overflow:hidden;
+}
+
+.progress-bar{
+height:10px;
+background:#4CAF50;
+border-radius:10px;
+transition:0.4s;
+}
+
+.rainbow{
+background:linear-gradient(90deg,red,orange,yellow,green,blue,indigo,violet);
+background-size:200%;
+animation:rainbowMove 2s linear infinite;
+}
+
+@keyframes rainbowMove{
+0%{background-position:0%}
+100%{background-position:200%}
+}
+
+.meal-block{
+margin-top:8px;
+}
+
+.assistant{
+margin-top:10px;
+padding:10px;
+background:#f3f3f3;
+border-radius:12px;
+font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<h2>💓 Family Pulse</h2>
+<div id="familyCode"></div>
+</div>
+
+<div class="card">
+<h3>Daily Check-In</h3>
+
+<div class="moods">
+<span onclick="selectMood(this)">😄</span>
+<span onclick="selectMood(this)">🙂</span>
+<span onclick="selectMood(this)">😐</span>
+<span onclick="selectMood(this)">😔</span>
+<span onclick="selectMood(this)">🤒</span>
+</div>
+
+<label><input type="checkbox" id="isSick"> I feel sick</label>
+
+<input type="number" id="waterCount" placeholder="Water glasses">
+
+<label><input type="checkbox" id="exercise"> Did exercise</label>
+
+<h4>Meals</h4>
+
+<div class="meal-block">
+<label><input type="checkbox" id="breakfast" onchange="toggleMeal('breakfast')"> Breakfast</label>
+<input type="text" id="breakfastFood" placeholder="Unavailable" disabled>
+</div>
+
+<div class="meal-block">
+<label><input type="checkbox" id="lunch" onchange="toggleMeal('lunch')"> Lunch</label>
+<input type="text" id="lunchFood" placeholder="Unavailable" disabled>
+</div>
+
+<div class="meal-block">
+<label><input type="checkbox" id="dinner" onchange="toggleMeal('dinner')"> Dinner</label>
+<input type="text" id="dinnerFood" placeholder="Unavailable" disabled>
+</div>
+
+<input type="text" id="bp" placeholder="Blood Pressure">
+<input type="text" id="sugar" placeholder="Sugar">
+<input type="text" id="cholesterol" placeholder="Cholesterol">
+
+<button onclick="submit()">Save / Update</button>
+</div>
+
+<h3>Family Members</h3>
+<div class="members" id="members"></div>
+
+<script>
+
+let user = JSON.parse(localStorage.getItem("currentUser"));
+let families = JSON.parse(localStorage.getItem("families")) || {};
+
+if(!user || !families[user.familyCode]){
+document.body.innerHTML="<h2>Please login again.</h2>";
+throw new Error("Invalid session");
+}
+
+if(!families[user.familyCode].members){
+families[user.familyCode].members=[];
+}
+
+document.getElementById("familyCode").innerHTML =
+`<div class="code">Family Code: ${user.familyCode}</div>`;
+
+let selectedMood="";
+
+function selectMood(el){
+document.querySelectorAll(".moods span").forEach(e=>e.classList.remove("selected"));
+el.classList.add("selected");
+selectedMood=el.innerText;
+}
+
+function toggleMeal(meal){
+let checkbox=document.getElementById(meal);
+let input=document.getElementById(meal+"Food");
+
+if(checkbox.checked){
+input.disabled=false;
+input.placeholder="What did you eat?";
+}else{
+input.value="";
+input.disabled=true;
+input.placeholder="Unavailable";
+}
+}
+
+function getFamily(){
+let families=JSON.parse(localStorage.getItem("families"))||{};
+let family=families[user.familyCode];
+if(!family.members) family.members=[];
+return {families,family};
+}
+
+function submit(){
+
+if(!selectedMood){
+alert("Select mood");
+return;
+}
+
+let {families,family}=getFamily();
+
+let waterValue=parseInt(document.getElementById("waterCount").value)||0;
+
+let breakfast=document.getElementById("breakfast").checked;
+let lunch=document.getElementById("lunch").checked;
+let dinner=document.getElementById("dinner").checked;
+
+let breakfastFood=document.getElementById("breakfastFood").value.toLowerCase();
+let lunchFood=document.getElementById("lunchFood").value.toLowerCase();
+let dinnerFood=document.getElementById("dinnerFood").value.toLowerCase();
+
+let breadCount=0;
+if(breakfast && breakfastFood.includes("bread")) breadCount++;
+if(lunch && lunchFood.includes("bread")) breadCount++;
+if(dinner && dinnerFood.includes("bread")) breadCount++;
+
+if(breadCount>=2){
+alert("🥖 Peasant 👑");
+}
+
+let entry={
+name:user.name,
+mood:selectedMood,
+sick:document.getElementById("isSick").checked,
+water:waterValue,
+exercise:document.getElementById("exercise").checked,
+breakfast,breakfastFood,
+lunch,lunchFood,
+dinner,dinnerFood,
+bp:document.getElementById("bp").value,
+sugar:document.getElementById("sugar").value,
+cholesterol:document.getElementById("cholesterol").value
+};
+
+let index=family.members.findIndex(m=>m.name===user.name);
+
+if(index!==-1){
+family.members[index]=entry;
+}else{
+family.members.push(entry);
+}
+
+families[user.familyCode]=family;
+localStorage.setItem("families",JSON.stringify(families));
+
+display();
+}
+
+function deleteMember(index){
+let {families,family}=getFamily();
+family.members.splice(index,1);
+families[user.familyCode]=family;
+localStorage.setItem("families",JSON.stringify(families));
+display();
+}
+
+function display(){
+let {family}=getFamily();
+const container=document.getElementById("members");
+container.innerHTML="";
+
+let adminData=family.members.find(m=>m.name===family.admin);
+createCard(family.admin,true,adminData);
+
+family.members
+.filter(m=>m.name!==family.admin)
+.forEach((m,index)=>{
+createCard(m.name,false,m,index);
+});
+}
+
+function createCard(name,isAdmin,data,index){
+
+const div=document.createElement("div");
+div.className="member-card"+(data?.sick?" sick":"");
+
+let waterDisplay=data?.water||0;
+let percent=Math.min((waterDisplay/8)*100,100);
+let rainbowClass=(waterDisplay===69)?"rainbow":"";
+
+let assistant="";
+
+if(data){
+let sugar=parseInt(data.sugar);
+let chol=parseInt(data.cholesterol);
+let bp=parseInt(data.bp);
+
+if(data.sick) assistant+="🤒 Rest well.<br>";
+if(waterDisplay<4) assistant+="💧 Drink more water.<br>";
+if(!data.exercise) assistant+="🏃 Add some exercise.<br>";
+if(!isNaN(sugar)&&sugar>140) assistant+="🍬 High sugar detected.<br>";
+if(!isNaN(chol)&&chol>240) assistant+="🧈 High cholesterol.<br>";
+if(!isNaN(bp)&&bp>140) assistant+="❤️ High BP.<br>";
+if(assistant==="") assistant="✅ You’re doing great today!";
+}
+
+div.innerHTML=`
+<h4>${name}${isAdmin?" (Admin)":""}</h4>
+${data?`
+<p>Mood: ${data.mood}</p>
+<p>Status: ${data.sick?"🤒 Sick":"Healthy"}</p>
+<p>Water: ${waterDisplay}/8</p>
+<div class="progress">
+<div class="progress-bar ${rainbowClass}" style="width:${percent}%"></div>
+</div>
+<p>Breakfast: ${data.breakfast?data.breakfastFood:"❌"}</p>
+<p>Lunch: ${data.lunch?data.lunchFood:"❌"}</p>
+<p>Dinner: ${data.dinner?data.dinnerFood:"❌"}</p>
+<p>Exercise: ${data.exercise?"✅":"❌"}</p>
+<p>BP: ${data.bp||"-"}</p>
+<p>Sugar: ${data.sugar||"-"}</p>
+<p>Cholesterol: ${data.cholesterol||"-"}</p>
+<div class="assistant"><b>🧠 Health Assistant:</b><br>${assistant}</div>
+`:`<p>No update yet</p>`}
+${user.role==="admin" && !isAdmin?
+`<button class="delete-btn" onclick="deleteMember(${index})">Delete</button>`
+:""}
+`;
+
+document.getElementById("members").appendChild(div);
+}
+
+display();
+
+</script>
+
+</body>
+</html>
